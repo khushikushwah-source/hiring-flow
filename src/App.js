@@ -1,8 +1,5 @@
-import React, { useState } from "react";
-import ReactFlow, {
-  Background,
-  Handle
-} from "reactflow";
+import React, { useState, useMemo } from "react";
+import ReactFlow, { Background } from "reactflow";
 import "reactflow/dist/style.css";
 import "./App.css";
 
@@ -17,26 +14,26 @@ const stages = [
         topics: [
           "Percentages / Ratios — 2–3 Q",
           "Profit & Loss / Simple Interest — 2–3 Q",
-          "Time, Speed, Work — 2–3 Q"
-        ]
+          "Time, Speed, Work — 2–3 Q",
+        ],
       },
       {
         name: "Logical Reasoning",
         topics: [
           "Series / Patterns — 2–3 Q",
           "Puzzles / Seating — 2–3 Q",
-          "Data Sufficiency — 1–2 Q"
-        ]
+          "Data Sufficiency — 1–2 Q",
+        ],
       },
       {
         name: "Verbal Ability",
         topics: [
           "Reading Comprehension — 3–4 Q",
           "Grammar / Error Spotting — 2–3 Q",
-          "Vocabulary / Fill in the blanks — 1–2 Q"
-        ]
-      }
-    ]
+          "Vocabulary — 1–2 Q",
+        ],
+      },
+    ],
   },
   {
     id: "s2",
@@ -48,10 +45,10 @@ const stages = [
         topics: [
           "Arrays / Strings — 1–2 Q",
           "Recursion — 1 Q",
-          "Dynamic Programming — 1 Q"
-        ]
-      }
-    ]
+          "Basic DP — 1 Q",
+        ],
+      },
+    ],
   },
   {
     id: "s3",
@@ -60,13 +57,9 @@ const stages = [
     sections: [
       {
         name: "Interview",
-        topics: [
-          "Project discussion",
-          "DSA & problem solving",
-          "Core subjects"
-        ]
-      }
-    ]
+        topics: ["Project discussion", "DSA round", "Core CS subjects"],
+      },
+    ],
   },
   {
     id: "s4",
@@ -75,113 +68,166 @@ const stages = [
     sections: [
       {
         name: "HR",
-        topics: [
-          "Behavioural questions",
-          "Salary, role & joining discussion"
-        ]
-      }
-    ]
-  }
+        topics: ["Behavioural questions", "Offer & Joining discussion"],
+      },
+    ],
+  },
 ];
 
+function StageNode({ label, time, number, onClick }) {
+  return (
+    <div className="stage-node" onClick={onClick}>
+      <div className="stage-circle">{number}</div>
+      <div>
+        <div className="stage-title">{label}</div>
+        <div className="stage-time">⏱ {time}</div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
-  const [active, setActive] = useState(null);
+  const [expanded, setExpanded] = useState(null);
 
-  const baseNodes = stages.map((stg, index) => ({
-    id: stg.id,
-    position: { x: 300 * index + 60, y: 250 },
-    data: {
-      label: (
-        <div
-          onClick={() => setActive(active === stg.id ? null : stg.id)}
-          className="main-stage"
-        >
-          <div className="circle">{index + 1}</div>
-          <strong>{stg.title}</strong>
-          <div className="time">⏱ {stg.time}</div>
-        </div>
-      )
-    },
-    style: { border: "none", background: "transparent" }
-  }));
+  const { nodes, edges } = useMemo(() => {
+    const ns = [];
+    const es = [];
 
-  let subNodes = [];
-  let edges = [];
+    const gapX = 300;
+    const topY = 140; // thoda neeche so title ke niche aaye
 
-  if (active) {
-    const stage = stages.find(s => s.id === active);
-
-    stage.sections.forEach((sec, i) => {
-      const y = 420;
-      const x = 200 + i * 250;
-
-      subNodes.push({
-        id: `${sec.name}`,
-        position: { x, y },
-        data: { label: <div className="sec-badge">{sec.name}</div> },
-        style: { border: "none", background: "transparent" }
+    // main row
+    stages.forEach((s, i) => {
+      ns.push({
+        id: s.id,
+        position: { x: i * gapX + 60, y: topY },
+        data: {
+          label: (
+            <StageNode
+              label={s.title}
+              time={s.time}
+              number={i + 1}
+              onClick={() =>
+                setExpanded((cur) => (cur === s.id ? null : s.id))
+              }
+            />
+          ),
+        },
       });
 
-      edges.push({
-        id: `e-${stage.id}-${sec.name}`,
-        source: stage.id,
-        target: sec.name,
-        animated: true,
-        style: { strokeDasharray: "6", strokeWidth: 2, stroke: "#4ade80" }
-      });
+      // dotted animated connector
+      if (i < stages.length - 1) {
+        es.push({
+          id: `e-${s.id}-${stages[i + 1].id}`,
+          source: s.id,
+          target: stages[i + 1].id,
+          type: "smoothstep",
+          animated: true,
+          style: {
+            strokeDasharray: "8 4",
+            stroke: "#38bdf8",
+            strokeWidth: 2,
+          },
+        });
+      }
     });
 
-    const topics = stage.sections.flatMap(sec => sec.topics);
-    subNodes.push({
-      id: `${stage.id}-topics`,
-      position: { x: 500, y: 550 },
-      data: {
-        label: (
-          <div className="topics-box">
-            {stage.sections.map(sec => (
-              <div key={sec.name} className="topics-sec">
-                <b>{sec.name}</b>
-                <ul>
-                  {sec.topics.map(t => (
-                    <li key={t}>{t}</li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        )
-      },
-      style: { border: "none", background: "transparent" }
-    });
+    // sub-flow for active stage
+    if (expanded) {
+      const s = stages.find((x) => x.id === expanded);
+      const idx = stages.findIndex((x) => x.id === expanded);
+      const baseX = idx * gapX + 60;
+      const midY = topY + 160;
+      const bottomY = midY + 160;
 
-    stage.sections.forEach(sec => {
-      edges.push({
-        id: `e-${sec.name}-topics`,
-        source: sec.name,
-        target: `${stage.id}-topics`,
-        animated: true,
-        style: { strokeDasharray: "4 4", strokeWidth: 2, stroke: "#38bdf8" }
+      // ellipse sections
+      s.sections.forEach((sec, j) => {
+        const offsetX = (j - (s.sections.length - 1) / 2) * 220;
+        const secId = `${s.id}-sec-${j}`;
+
+        ns.push({
+          id: secId,
+          position: { x: baseX + offsetX, y: midY },
+          data: { label: <div className="sec-node">{sec.name}</div> },
+        });
+
+        es.push({
+          id: `e-${s.id}-${secId}`,
+          source: s.id,
+          target: secId,
+          type: "smoothstep",
+          animated: true,
+          style: {
+            strokeDasharray: "8 4",
+            stroke: "#4ade80",
+            strokeWidth: 2,
+          },
+        });
       });
-    });
-  }
+
+      // bottom details card
+      const detailId = `${s.id}-details`;
+      ns.push({
+        id: detailId,
+        position: { x: baseX - 100, y: bottomY },
+        data: {
+          label: (
+            <div className="topics-box">
+              {s.sections.map((sec) => (
+                <div key={sec.name} className="topics-section">
+                  <div className="topics-section-title">{sec.name}</div>
+                  <ul>
+                    {sec.topics.map((t) => (
+                      <li key={t}>{t}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          ),
+        },
+      });
+
+      s.sections.forEach((sec, j) => {
+        const secId = `${s.id}-sec-${j}`;
+        es.push({
+          id: `e-${secId}-${detailId}`,
+          source: secId,
+          target: detailId,
+          type: "smoothstep",
+          animated: true,
+          style: {
+            strokeDasharray: "6 4",
+            stroke: "#60a5fa",
+            strokeWidth: 2,
+          },
+        });
+      });
+    }
+
+    return { nodes: ns, edges: es };
+  }, [expanded]);
 
   return (
-    // <div className="wrapper">
-    //   <div className="title-card">
-    //     <h2>Infosys — Software Developer Hiring Process</h2>
-    //     <p>This flowchart shows the typical stages. Click on each box to view sections and question breakup.</p>
-    //   </div>
+    <div className="hp-react-root">
+      <div className="hp-react-header">
+        <h2>Infosys — Software Developer Hiring Process</h2>
+        <p>
+          This flowchart shows the typical stages. Click on each box to view
+          sections and question breakup.
+        </p>
+      </div>
 
-      <div className="flow-area">
-        <ReactFlow
-          nodes={[...baseNodes, ...subNodes]}
-          edges={edges}
-          fitView
-          zoomOnScroll
-        >
-          <Background variant="dots" gap={22} size={1} color="#1e293b" />
+      <div className="hp-react-flow">
+        <ReactFlow nodes={nodes} edges={edges} fitView>
+          <Background
+            variant="dots"
+            gap={24}
+            size={1}
+            color="rgba(148,163,184,0.35)"
+          />
         </ReactFlow>
       </div>
-    //</div>
+    </div>
   );
 }
