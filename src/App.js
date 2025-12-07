@@ -1,79 +1,26 @@
+// App.js
 import React, { useState, useMemo } from "react";
 import ReactFlow, { Background } from "reactflow";
 import "reactflow/dist/style.css";
 import "./App.css";
 
-const stages = [
-  {
-    id: "s1",
-    title: "Online Aptitude Test",
-    time: "40–45 min",
-    sections: [
-      {
-        name: "Quantitative",
-        topics: [
-          "Percentages / Ratios — 2–3 Q",
-          "Profit & Loss / Simple Interest — 2–3 Q",
-          "Time, Speed, Work — 2–3 Q",
-        ],
-      },
-      {
-        name: "Logical Reasoning",
-        topics: [
-          "Series / Patterns — 2–3 Q",
-          "Puzzles / Seating — 2–3 Q",
-          "Data Sufficiency — 1–2 Q",
-        ],
-      },
-      {
-        name: "Verbal Ability",
-        topics: [
-          "Reading Comprehension — 3–4 Q",
-          "Grammar / Error Spotting — 2–3 Q",
-          "Vocabulary — 1–2 Q",
-        ],
-      },
-    ],
-  },
-  {
-    id: "s2",
-    title: "Technical Assessment",
-    time: "45–60 min",
-    sections: [
-      {
-        name: "Coding",
-        topics: [
-          "Arrays / Strings — 1–2 Q",
-          "Recursion — 1 Q",
-          "Basic DP — 1 Q",
-        ],
-      },
-    ],
-  },
-  {
-    id: "s3",
-    title: "Technical Interview",
-    time: "30–45 min",
-    sections: [
-      {
-        name: "Interview",
-        topics: ["Project discussion", "DSA round", "Core CS subjects"],
-      },
-    ],
-  },
-  {
-    id: "s4",
-    title: "HR Interview",
-    time: "20–30 min",
-    sections: [
-      {
-        name: "HR",
-        topics: ["Behavioural questions", "Offer & Joining discussion"],
-      },
-    ],
-  },
-];
+// 🔥 JSON hiring process fetch from Streamlit iframe page
+const urlParams = new URLSearchParams(window.location.search);
 
+// stages: JSON array of stages passed from Streamlit
+let stages = [];
+try {
+  const raw = urlParams.get("data");
+  stages = raw ? JSON.parse(raw) : [];
+} catch (e) {
+  console.error("Invalid stages JSON from Streamlit:", e);
+  stages = [];
+}
+
+const company = urlParams.get("company") || "Company";
+const domain = urlParams.get("domain") || "Role";
+
+// ---- Single stage box component ----
 function StageNode({ label, time, number, onClick }) {
   return (
     <div className="stage-node" onClick={onClick}>
@@ -87,6 +34,7 @@ function StageNode({ label, time, number, onClick }) {
 }
 
 export default function App() {
+  // expanded = kis stage ka index open hai (null = koi nahi)
   const [expanded, setExpanded] = useState(null);
 
   const { nodes, edges } = useMemo(() => {
@@ -96,10 +44,12 @@ export default function App() {
     const gapX = 300;
     const topY = 140; // thoda neeche so title ke niche aaye
 
-    // main row
+    // ---------- MAIN ROW STAGES ----------
     stages.forEach((s, i) => {
+      const stageId = `stage-${i}`;
+
       ns.push({
-        id: s.id,
+        id: stageId,
         position: { x: i * gapX + 60, y: topY },
         data: {
           label: (
@@ -108,19 +58,20 @@ export default function App() {
               time={s.time}
               number={i + 1}
               onClick={() =>
-                setExpanded((cur) => (cur === s.id ? null : s.id))
+                setExpanded((cur) => (cur === i ? null : i))
               }
             />
           ),
         },
       });
 
-      // dotted animated connector
+      // dotted animated connector between stages
       if (i < stages.length - 1) {
+        const nextId = `stage-${i + 1}`;
         es.push({
-          id: `e-${s.id}-${stages[i + 1].id}`,
-          source: s.id,
-          target: stages[i + 1].id,
+          id: `e-${stageId}-${nextId}`,
+          source: stageId,
+          target: nextId,
           type: "smoothstep",
           animated: true,
           style: {
@@ -132,18 +83,21 @@ export default function App() {
       }
     });
 
-    // sub-flow for active stage
-    if (expanded) {
-      const s = stages.find((x) => x.id === expanded);
-      const idx = stages.findIndex((x) => x.id === expanded);
-      const baseX = idx * gapX + 60;
+    // ---------- SUB-FLOW for ACTIVE STAGE ----------
+    if (expanded !== null && stages[expanded]) {
+      const s = stages[expanded];
+      const stageId = `stage-${expanded}`;
+
+      const baseX = expanded * gapX + 60;
       const midY = topY + 160;
       const bottomY = midY + 160;
 
-      // ellipse sections
-      s.sections.forEach((sec, j) => {
-        const offsetX = (j - (s.sections.length - 1) / 2) * 220;
-        const secId = `${s.id}-sec-${j}`;
+      const sections = s.sections || [];
+
+      // ellipse section nodes
+      sections.forEach((sec, j) => {
+        const offsetX = (j - (sections.length - 1) / 2) * 220;
+        const secId = `${stageId}-sec-${j}`;
 
         ns.push({
           id: secId,
@@ -152,8 +106,8 @@ export default function App() {
         });
 
         es.push({
-          id: `e-${s.id}-${secId}`,
-          source: s.id,
+          id: `e-${stageId}-${secId}`,
+          source: stageId,
           target: secId,
           type: "smoothstep",
           animated: true,
@@ -165,19 +119,19 @@ export default function App() {
         });
       });
 
-      // bottom details card
-      const detailId = `${s.id}-details`;
+      // bottom topics box
+      const detailId = `${stageId}-details`;
       ns.push({
         id: detailId,
         position: { x: baseX - 100, y: bottomY },
         data: {
           label: (
             <div className="topics-box">
-              {s.sections.map((sec) => (
+              {sections.map((sec) => (
                 <div key={sec.name} className="topics-section">
                   <div className="topics-section-title">{sec.name}</div>
                   <ul>
-                    {sec.topics.map((t) => (
+                    {(sec.topics || []).map((t) => (
                       <li key={t}>{t}</li>
                     ))}
                   </ul>
@@ -188,8 +142,9 @@ export default function App() {
         },
       });
 
-      s.sections.forEach((sec, j) => {
-        const secId = `${s.id}-sec-${j}`;
+      // connect each section to details box
+      sections.forEach((sec, j) => {
+        const secId = `${stageId}-sec-${j}`;
         es.push({
           id: `e-${secId}-${detailId}`,
           source: secId,
@@ -211,10 +166,12 @@ export default function App() {
   return (
     <div className="hp-react-root">
       <div className="hp-react-header">
-        <h2>Infosys — Software Developer Hiring Process</h2>
+        <h2>
+          {company} — {domain} Hiring Process
+        </h2>
         <p>
-          This flowchart shows the typical stages. Click on each box to view
-          sections and question breakup.
+          This flowchart shows the hiring stages of {company}. Click any stage
+          to view sections and topic breakup.
         </p>
       </div>
 
